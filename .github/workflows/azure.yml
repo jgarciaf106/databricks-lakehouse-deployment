@@ -1,0 +1,143 @@
+name: Workspace Management
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+env:
+  BACKEND_RG_NAME: ${{ secrets.BACKEND_RG_NAME }}
+  BACKEND_SA_NAME: ${{ secrets.BACKEND_SA_NAME }}
+  BACKEND_CONTAINER_NAME: ${{ secrets.BACKEND_CONTAINER_NAME }}
+  BACKEND_KEY: ${{ secrets.BACKEND_KEY }}
+
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  DATABRICKS_ACCOUNT_ID: ${{ secrets.DATABRICKS_ACCOUNT_ID }}
+  
+
+jobs:
+  check-date:
+    name: Validate run date
+    environment: azure
+    runs-on: ubuntu-latest
+    outputs:
+      run_job: ${{ steps.date-check.outputs.run }}
+    steps:
+      - name: Check Date for Custom Schedule
+        id: date-check
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
+          DAY=$(date +%d)
+          MONTH=$(date +%m)
+          YEAR=$(date +%Y)
+
+          # Calculate the first Sunday and third Sunday of the month
+          FIRST_SUNDAY=$(date -d "$YEAR-$MONTH-01 +$((7 - $(date -d $YEAR-$MONTH-01 +%u) % 7)) days" +%Y-%m-%d)
+          THIRD_SUNDAY=$(date -d "$FIRST_SUNDAY +14 days" +%Y-%m-%d)
+
+          # Calculate the first Monday after the first Sunday and third Sunday
+          FIRST_MONDAY_AFTER_FIRST_SUNDAY=$(date -d "$FIRST_SUNDAY +1 day" +%Y-%m-%d)
+          FIRST_MONDAY_AFTER_THIRD_SUNDAY=$(date -d "$THIRD_SUNDAY +1 day" +%Y-%m-%d)
+
+          # Calculate the Saturday before these Mondays
+          SATURDAY_BEFORE_FIRST_MONDAY=$(date -d "$FIRST_MONDAY_AFTER_FIRST_SUNDAY -2 days" +%Y-%m-%d)
+          SATURDAY_BEFORE_THIRD_MONDAY=$(date -d "$FIRST_MONDAY_AFTER_THIRD_SUNDAY -2 days" +%Y-%m-%d)
+
+          # Check if today matches any of the dates
+          if [[ "$TODAY" == "$FIRST_MONDAY_AFTER_FIRST_SUNDAY" || \
+                "$TODAY" == "$FIRST_MONDAY_AFTER_THIRD_SUNDAY" || \
+                "$TODAY" == "$SATURDAY_BEFORE_FIRST_MONDAY" || \
+                "$TODAY" == "$SATURDAY_BEFORE_THIRD_MONDAY" ]]; then
+            echo "Custom schedule matched: $TODAY"
+            echo "run=true" >> $GITHUB_ENV
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "No match: $TODAY"
+            echo "run=false" >> $GITHUB_ENV
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+  create-workspace:
+    name: Create Azure Workspace
+    environment: azure
+    needs: check-date
+    if: needs.check-date.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: adb-lakehouse
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Set execute permissions
+        run: chmod +x actions.sh
+
+      - name: Terraform Init
+        id: init
+        run: ./actions.sh init
+
+      - name: Terraform Validate
+        id: validate
+        run: ./actions.sh validate
+
+      - name: Terraform Plan
+        id: plan
+        run: ./actions.sh plan
+        continue-on-error: true
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        id: apply
+        run: ./actions.sh apply
+        continue-on-error: true
+
+      - name: Terraform Apply Status
+        if: steps.apply.outcome == 'failure'
+        run: exit 1
+
+      - name: Success
+        if: steps.apply.outcome == 'success'
+        run: echo "Workspace Deployment Successful"
+
+  destroy-workspace:
+    name: Destoy Azure Workspace
+    environment: azure
+    needs: check-date
+    if: needs.check-date.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: adb-lakehouse
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Set execute permissions
+        run: chmod +x actions.sh
+
+      - name: Terraform Destroy
+        id: destroy
+        run: ./actions.sh destroy
+        continue-on-error: true
+
+      - name: Terraform destroy Status
+        if: steps.destroy.outcome == 'failure'
+        run: exit 1
+
+      - name: Success
+        if: steps.destroy.outcome == 'success'
+        run: echo "Workspace Destroy Successful"
+
