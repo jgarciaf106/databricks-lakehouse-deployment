@@ -20,51 +20,93 @@ env:
 jobs:
   check-date:
     name: Validate run date
-    environment: azure
     runs-on: ubuntu-latest
     outputs:
-      run_job: ${{ steps.date-check.outputs.run }}
+      deploy: ${{ steps.date-check.outputs.run }}
+      destroy: ${{ steps.date-check.outputs.run }}
     steps:
       - name: Check Date for Custom Schedule
         id: date-check
         run: |
-          TODAY=$(date +%Y-%m-%d)
-          DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
-          DAY=$(date +%d)
-          MONTH=$(date +%m)
-          YEAR=$(date +%Y)
+          #!/bin/bash
 
-          # Calculate the first Sunday and third Sunday of the month
-          FIRST_SUNDAY=$(date -d "$YEAR-$MONTH-01 +$((7 - $(date -d $YEAR-$MONTH-01 +%u) % 7)) days" +%Y-%m-%d)
-          THIRD_SUNDAY=$(date -d "$FIRST_SUNDAY +14 days" +%Y-%m-%d)
-
-          # Calculate the first Monday after the first Sunday and third Sunday
-          FIRST_MONDAY_AFTER_FIRST_SUNDAY=$(date -d "$FIRST_SUNDAY +1 day" +%Y-%m-%d)
-          FIRST_MONDAY_AFTER_THIRD_SUNDAY=$(date -d "$THIRD_SUNDAY +1 day" +%Y-%m-%d)
-
-          # Calculate the Saturday before these Mondays
-          SATURDAY_BEFORE_FIRST_MONDAY=$(date -d "$FIRST_MONDAY_AFTER_FIRST_SUNDAY -2 days" +%Y-%m-%d)
-          SATURDAY_BEFORE_THIRD_MONDAY=$(date -d "$FIRST_MONDAY_AFTER_THIRD_SUNDAY -2 days" +%Y-%m-%d)
-
-          # Check if today matches any of the dates
-          if [[ "$TODAY" == "$FIRST_MONDAY_AFTER_FIRST_SUNDAY" || \
-                "$TODAY" == "$FIRST_MONDAY_AFTER_THIRD_SUNDAY" || \
-                "$TODAY" == "$SATURDAY_BEFORE_FIRST_MONDAY" || \
-                "$TODAY" == "$SATURDAY_BEFORE_THIRD_MONDAY" ]]; then
-            echo "Custom schedule matched: $TODAY"
-            echo "run=true" >> $GITHUB_ENV
-            echo "run=true" >> $GITHUB_OUTPUT
+          # Detect OS type (GNU/Linux vs macOS)
+          if date --version >/dev/null 2>&1; then
+              OS="linux"  # GNU date (Linux/Ubuntu)
           else
-            echo "No match: $TODAY"
-            echo "run=false" >> $GITHUB_ENV
-            echo "run=false" >> $GITHUB_OUTPUT
+              OS="macos"  # BSD date (macOS)
+          fi
+
+          # Get today's date
+          TODAY=$(date +%Y-%m-%d)
+
+          # Get the current year and month (or allow overrides)
+          YEAR=${YEAR:-$(date +%Y)}
+          MONTH=${MONTH:-$(date +%m)}
+
+          # Find the first Sunday of the month
+          if [[ "$OS" == "macos" ]]; then
+              FIRST_DAY_OF_MONTH=$(date -j -v1d -v"${MONTH}m" -v"${YEAR}y" +%u)
+              if [ "$FIRST_DAY_OF_MONTH" -eq 7 ]; then
+                  FIRST_SUNDAY=$(date -j -v1d -v"${MONTH}m" -v"${YEAR}y" +%Y-%m-%d)
+              else
+                  FIRST_SUNDAY=$(date -j -v1d -v"${MONTH}m" -v"${YEAR}y" -v+"$((7 - FIRST_DAY_OF_MONTH))"d +%Y-%m-%d)
+              fi
+          else
+              FIRST_DAY_OF_MONTH=$(date -d "$YEAR-$MONTH-01" +%u)
+              if [ "$FIRST_DAY_OF_MONTH" -eq 7 ]; then
+                  FIRST_SUNDAY=$(date -d "$YEAR-$MONTH-01" +%Y-%m-%d)
+              else
+                  FIRST_SUNDAY=$(date -d "$YEAR-$MONTH-01 +$((7 - FIRST_DAY_OF_MONTH)) days" +%Y-%m-%d)
+              fi
+          fi
+
+          # Find the third Sunday (14 days after first Sunday)
+          if [[ "$OS" == "macos" ]]; then
+              THIRD_SUNDAY=$(date -j -v+14d -f "%Y-%m-%d" "$FIRST_SUNDAY" +%Y-%m-%d)
+          else
+              THIRD_SUNDAY=$(date -d "$FIRST_SUNDAY +14 days" +%Y-%m-%d)
+          fi
+
+          # Find the Saturday before each Sunday (-1 day)
+          if [[ "$OS" == "macos" ]]; then
+              SATURDAY_BEFORE_FIRST_SUNDAY=$(date -j -v-1d -f "%Y-%m-%d" "$FIRST_SUNDAY" +%Y-%m-%d)
+              SATURDAY_BEFORE_THIRD_SUNDAY=$(date -j -v-1d -f "%Y-%m-%d" "$THIRD_SUNDAY" +%Y-%m-%d)
+          else
+              SATURDAY_BEFORE_FIRST_SUNDAY=$(date -d "$FIRST_SUNDAY -1 day" +%Y-%m-%d)
+              SATURDAY_BEFORE_THIRD_SUNDAY=$(date -d "$THIRD_SUNDAY -1 day" +%Y-%m-%d)
+          fi
+
+          # Find the Monday after each Sunday (+1 day)
+          if [[ "$OS" == "macos" ]]; then
+              MONDAY_AFTER_FIRST_SUNDAY=$(date -j -v+1d -f "%Y-%m-%d" "$FIRST_SUNDAY" +%Y-%m-%d)
+              MONDAY_AFTER_THIRD_SUNDAY=$(date -j -v+1d -f "%Y-%m-%d" "$THIRD_SUNDAY" +%Y-%m-%d)
+          else
+              MONDAY_AFTER_FIRST_SUNDAY=$(date -d "$FIRST_SUNDAY +1 day" +%Y-%m-%d)
+              MONDAY_AFTER_THIRD_SUNDAY=$(date -d "$THIRD_SUNDAY +1 day" +%Y-%m-%d)
+          fi
+
+
+          # Check if today is a Monday after the first or third Sunday
+          if [[ "$TODAY" == "$MONDAY_AFTER_FIRST_SUNDAY" || "$TODAY" == "$MONDAY_AFTER_THIRD_SUNDAY" ]]; then
+              echo "Monday schedule matched: $TODAY"
+              echo "run=true" >> $GITHUB_ENV
+              echo "run=true" >> $GITHUB_OUTPUT
+          elif [[ "$TODAY" == "$SATURDAY_BEFORE_FIRST_SUNDAY" || "$TODAY" == "$SATURDAY_BEFORE_THIRD_SUNDAY" ]]; then
+              echo "Saturday schedule matched: $TODAY"
+              echo "run=true" >> $GITHUB_ENV
+              echo "run=true" >> $GITHUB_OUTPUT
+          else
+              echo "No match: $TODAY"
+              echo "run=false" >> $GITHUB_ENV
+              echo "run=false" >> $GITHUB_OUTPUT
           fi
 
   create-workspace:
     name: Create Azure Workspace
     environment: azure
     needs: check-date
-    if: needs.check-date.outputs.run == 'true'
+    if: needs.check-date.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -113,7 +155,7 @@ jobs:
     name: Destoy Azure Workspace
     environment: azure
     needs: check-date
-    if: needs.check-date.outputs.run == 'true'
+    if: needs.check-date.outputs.destroy == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
