@@ -14,7 +14,10 @@ env:
   AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  
   DATABRICKS_ACCOUNT_ID: ${{ secrets.DATABRICKS_ACCOUNT_ID }}
+  DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+  DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
   
 
 jobs:
@@ -22,8 +25,8 @@ jobs:
     name: Validate run date
     runs-on: ubuntu-latest
     outputs:
-      deploy: ${{ steps.date-check.outputs.run }}
-      destroy: ${{ steps.date-check.outputs.run }}
+      deploy: ${{ steps.date-check.outputs.deploy }}
+      destroy: ${{ steps.date-check.outputs.destroy }}
     steps:
       - name: Check Date for Custom Schedule
         id: date-check
@@ -86,20 +89,21 @@ jobs:
               MONDAY_AFTER_THIRD_SUNDAY=$(date -d "$THIRD_SUNDAY +1 day" +%Y-%m-%d)
           fi
 
-
           # Check if today is a Monday after the first or third Sunday
           if [[ "$TODAY" == "$MONDAY_AFTER_FIRST_SUNDAY" || "$TODAY" == "$MONDAY_AFTER_THIRD_SUNDAY" ]]; then
               echo "Monday schedule matched: $TODAY"
-              echo "run=true" >> $GITHUB_ENV
-              echo "run=true" >> $GITHUB_OUTPUT
+              echo "deploy=true" >> $GITHUB_ENV
+              echo "deploy=true" >> $GITHUB_OUTPUT
           elif [[ "$TODAY" == "$SATURDAY_BEFORE_FIRST_SUNDAY" || "$TODAY" == "$SATURDAY_BEFORE_THIRD_SUNDAY" ]]; then
               echo "Saturday schedule matched: $TODAY"
-              echo "run=true" >> $GITHUB_ENV
-              echo "run=true" >> $GITHUB_OUTPUT
+              echo "destroy=true" >> $GITHUB_ENV
+              echo "destroy=true" >> $GITHUB_OUTPUT
           else
               echo "No match: $TODAY"
-              echo "run=false" >> $GITHUB_ENV
-              echo "run=false" >> $GITHUB_OUTPUT
+              echo "destroy=false" >> $GITHUB_ENV
+              echo "destroy=false" >> $GITHUB_OUTPUT
+              echo "deploy=false" >> $GITHUB_ENV
+              echo "deploy=false" >> $GITHUB_OUTPUT
           fi
 
   create-workspace:

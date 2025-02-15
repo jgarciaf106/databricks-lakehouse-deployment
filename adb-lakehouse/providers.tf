@@ -11,7 +11,8 @@ provider "databricks" {
   alias      = "account"
   host       = "https://accounts.azuredatabricks.net"
   account_id = var.account_id
-  profile    = "ONE-ENV-AZURE"
+  client_id     = var.databricks_client_id
+  client_secret = var.databricks_client_secret
 }
 
 provider "databricks" {

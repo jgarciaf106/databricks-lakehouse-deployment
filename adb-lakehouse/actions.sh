@@ -19,20 +19,18 @@ VAR_ARGS=(
     -var="azure_client_id=$AZURE_CLIENT_ID"
     -var="azure_client_secret=$AZURE_CLIENT_SECRET"
     -var="account_id=$DATABRICKS_ACCOUNT_ID"
-    -var="databricks_workspace_name=andresg-az-lab-ws"
-    -var="environment_name=dev"
-    -var="location=eastus2"
-    -var="managed_resource_group_name=andresg.mrg"
-    -var="metastore_name=andresg-az-lab-ms"
-    -var="project_name=andresg-az-lab"
-    -var="resource_group_name=andresg.rg"
-    -var="private_subnet_address_prefixes=[\"16.0.1.0/24\"]"
-    -var="public_subnet_address_prefixes=[\"16.0.2.0/24\"]"
-    -var="vnet_address_space=16.0.0.0/22"
-    -var="storage_account_names=[\"andresgazlabadls\"]"
-    -var="tags={\"owner\" : \"andres.garcia@databricks.com\"}"
-    -var="dev_team=[\"andres.garcia@databricks.com\"]"
+    -var="databricks_client_id=$DATABRICKS_CLIENT_ID"
+    -var="databricks_client_secret=$DATABRICKS_CLIENT_SECRET"
 )
+
+if [[ -n "$DEPLOYMENT_CONFIG" ]]; then
+    while IFS= read -r line; do
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ -n "$line" ]]; then
+            VAR_ARGS+=("-var=\"$line\"")
+        fi
+    done <<< "$DEPLOYMENT_CONFIG"
+fi
 
 case "$1" in
 fmt)
