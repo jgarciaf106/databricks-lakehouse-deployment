@@ -2,7 +2,7 @@ name: Workspace Management
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '* * * * *'
 
 env:
   BACKEND_RG_NAME: ${{ secrets.BACKEND_RG_NAME }}
