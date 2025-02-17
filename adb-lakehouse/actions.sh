@@ -14,7 +14,7 @@ INIT_VARS=(
 )
 
 VAR_ARGS=(
-    -var="azure_subscription_id=$AZURE_SUBSCRIPTION_ID"
+    #-var="azure_subscription_id=$AZURE_SUBSCRIPTION_ID"
     -var="azure_tenant_id=$AZURE_TENANT_ID"
     -var="azure_client_id=$AZURE_CLIENT_ID"
     -var="azure_client_secret=$AZURE_CLIENT_SECRET"
