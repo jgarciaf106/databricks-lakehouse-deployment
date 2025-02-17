@@ -27,7 +27,7 @@ if [[ -n "$DEPLOYMENT_CONFIG" ]]; then
     while IFS= read -r line; do
         line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [[ -n "$line" ]]; then
-            VAR_ARGS+=("-var=\"$line\"")
+            VAR_ARGS+=(-var=$line)
         fi
     done <<< "$DEPLOYMENT_CONFIG"
 fi
