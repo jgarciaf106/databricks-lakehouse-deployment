@@ -19,8 +19,6 @@ VAR_ARGS=(
     -var="azure_client_id=$ARM_CLIENT_ID"
     -var="azure_client_secret=$ARM_CLIENT_SECRET"
     -var="account_id=$DATABRICKS_ACCOUNT_ID"
-    -var="databricks_client_id=$DATABRICKS_CLIENT_ID"
-    -var="databricks_client_secret=$DATABRICKS_CLIENT_SECRET"
 )
 
 if [[ -n "$DEPLOYMENT_CONFIG" ]]; then
