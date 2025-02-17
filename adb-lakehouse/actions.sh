@@ -32,6 +32,8 @@ if [[ -n "$DEPLOYMENT_CONFIG" ]]; then
     done <<< "$DEPLOYMENT_CONFIG"
 fi
 
+printf "%s\n" "${VAR_ARGS[@]}"
+
 case "$1" in
 fmt)
     terraform fmt -check
