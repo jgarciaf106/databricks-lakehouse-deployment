@@ -86,16 +86,6 @@ variable "account_id" {
   description = "Databricks Account ID"
 }
 
-variable "databricks_client_id" {
-  type        = string
-  description = "databricks Client ID"
-}
-
-variable "databricks_client_secret" {
-  type        = string
-  description = "databricks Client Secret"
-}
-
 variable "dev_team" {
   type        = list(string)
   description = "List of developers in the dev team"
